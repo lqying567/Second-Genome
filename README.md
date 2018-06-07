@@ -1,2 +1,1 @@
-Bioinformatics Intern in 
-Second-Genome
+Bioinformatics Internship
