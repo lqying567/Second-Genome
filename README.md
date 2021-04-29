@@ -1,1 +1,1 @@
-Bioinformatics Internship
+Bioinformatics
