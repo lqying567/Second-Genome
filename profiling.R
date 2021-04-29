@@ -1,5 +1,10 @@
 
 library(biomaRt)
+library(gplots)
+library(GSVA)
+library(NbClust)
+library(readxl)
+
 s=read.table('Pancreas_Normal_FPKM_summary.txt',header = T,sep='\t')
 ID=rownames(s)
 human <- useMart("ensembl", dataset="hsapiens_gene_ensembl") 
@@ -57,7 +62,7 @@ cor(data$FPKM,data$fpkm2)
 plot(data$FPKM,data$fpkm2,xlim=c(0,1000),ylim=c(0,1000))
 
 ## kmeans Clutering based on xCell result
-library("gplots")
+
 result=read.table('Breast_tumor_xCell_result.txt',header=T,sep='\t')
 result2=result[idx,]
 kmean=kmeans(t(result2),3)
@@ -80,9 +85,7 @@ heatmap.2(as.matrix(immu),Rowv=F,trace = "none", density.info = "none",symm=F,sc
           col = my_palette)
 
 ## GSEA for immune cell signatures
-library(GSVA)
-library(NbClust)
-library(readxl)
+
 data=read_xlsx('C:/Users/lanqing.ying/Downloads/Immune escape supple tables.xlsx',sheet = 1,skip = 1)
 gset.list=NULL
 for (cell in unique(data$CellType)){
