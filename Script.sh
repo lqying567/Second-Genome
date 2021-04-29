@@ -1,40 +1,102 @@
 #!/bin/bash
-#Download SRA file, Cut adapter sequence CTGTAGGCACCATCAAT  and remove sequence shorter than 3
-cd /Users/lanqingying/Downloads/sratoolkit.2.8.2-1-mac64/bin
-./prefetch SRR
-./fastq-dump SRR.sra
-~/Library/Python/2.7/bin/cutadapt -a -m 3 XXXXX SRR.fastq>SRR_trimmed.fastq
+# Tools 
+export PATH="/fast-data/Lanqing/Tools/Hg38_Mapping_Tools/bin":$PATH
+printf "Pipeline Started at \t"
+date +"%T"
+######## Initialize Variable ########
+ID=""
+ref_name="hg38"
+THREAD=4
+LIB="NextSeq"
+START_FROM_SCRATCH="n"
+DIR=$PWD
+INTERVAL="/fast-data/Lanqing/Tools/Hg38_Mapping_Tools/coveredRegion_final_use.hg38.bed"
+######## Various functions ########
+err(){
+  echo "$1.exiting";
+  exit 1; # any non-0 exit code signals an error
+}
 
-#remove trRNA
-export PATH=$PATH:~/Downloads/bowtie2-2.2.9 
-cd /Users/lanqingying/Documents/SRA/Bowtie2
-bowtie2-build -f file.fa trRNA
-bowtie2 -x trRNA -U SRR_trimmed.fastq -S output.sam —-un SRR_removed.fastq —-quiet
-rm output.sam
+ckFile(){
+  if [ ! -s "$1" ]; then
+    err "$2 File '$1' not found or is empty";
+  fi
+}
+is_in_path() {
+  if [ ! -x "$(command -v "$1")" ]; then
+    echo "$1 is not in path, existing"
+    exit 1;
+  fi
+}
 
-#Length distribution
-python LengthHist.py
+is_in_path "run-bwamem"
+is_in_path "bwa"
+is_in_path "samtools"
+is_in_path "k8"
+is_in_path "seqtk"
+is_in_path "mosdepth"
+is_in_path "fastqc"
+#is_in_path "samblaster"
+GATK=$(type -P "gatk")
 
-#map to reference genome
-export PATH=$PATH:~/Downloads/bowtie2-2.2.9 
-cd /Users/lanqingying/Documents/SRA/Bowtie2
-bowtie2 -x Ecoli -U SRR_removed.fastq -S SRR.sam  —-quiet
+usage() {
+    if [ -n "$1" ]; then echo $1 >&2; fi
+    cat <<EOF >&2
+Usage: $(basename $0) [options] <ProjectTable>
+Runs Exome pipeline using GATK gatk-4.1.4.1/
 
-export PATH=/usr/local/samtools-1.6/bin:$PATH
-samtools view -Sb SRR.sam > SRR.bam
-samtools sort SRR.bam >SRR_sorted.bam
-bedtools bamtobed -i SRR_sorted.bam>SRR_sorted.bed
-#align to 5' end
-bedtools genomecov -ibam SRR_sorted.bam -5  -bg  > SRR_5.bedgraph
-#align to 3' end
-bedtools genomecov -ibam SRR_sorted.bam -3  -bg  > SRR_3.bedgraph
-#align to center 
-python CenterAlign.py
-bedtools sort -i SRR_c.bedgraph > SRR_center.bedgraph
-rm SRR_c.bedgraph
+Options:
+  -o <string>  	Output Directory  (default: $DIR)
+  -r <ref>  	refference genome version either hg19 or hg38 (default: $ref_name)
+  -i <string> 	Interval list from exome capture regions (default: $INTERVAL)
+  -g <GATK> 	path to gatk (default: $GATK)
+  -t <INT>	Number of Thread to use (default: $THREAD)
+  -l <string>	Library name: LB in Bam (default: $LIB)
+  -s <y/n>	Start everything from scrath ?(default: $START_FROM_SCRATCH)
+  -h           	produce this message
+  -d          	debug mode, do not delete intermediate files
+EOF
+    exit 1
+}
 
-#Plot the alignment
-Python plot.py
+while getopts ":hd:o:r:i:g:t:l:s:" opt; do
+  case $opt in
+	h)usage;;
+	d)debug=1;;
+	o)DIR=$OPTARG;;
+	r)ref_name=$OPTARG ;;
+	i)INTERVAL=$OPTARG;;
+	g)GATK_JAR=$OPTARG ;;
+	t)THREAD=$OPTARG;;
+	l)LIB=$OPTARG;;
+	s)START_FROM_SCRATCH=$OPTARG;;	
+	\?)usage "Invalid option: -$OPTARG";;
+	:)usage "Option -$OPTARG requires an argument";;
+  esac
+done
 
+out_folder=$(dirname $out_prefix)
+prefix="${File%%.*}"
+
+i=${File##*/}
+j=${File2##*/}
+fastqDir=${File%/*}
+name="$( cut -d '_' -f -3 <<< "$i" )"
+sample_name=${out_prefix##*/}
+
+if [ ! -d "$out_folder" ]
+then
+  mkdir -p $out_folder
+fi
+
+if [ ! -d "$out_folder/$sample_name/" ]
+then
+  mkdir -p $out_folder/$sample_name/
+fi
+
+cd $out_folder/$sample_name/
+
+ProjectTable=$1
+ckFile "$ProjectTable" "ProjectTable"
 
 
